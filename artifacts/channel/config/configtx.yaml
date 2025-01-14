@@ -35,7 +35,7 @@ Organizations:
         ID: SampleOrg
 
         # MSPDir is the filesystem path which contains the MSP configuration.
-        MSPDir: msp
+        MSPDir: crypto-config/ordererOrganizations/example.com/msp
 
         # Policies defines the set of policies at this level of the config tree
         # For organization policies, their canonical path is usually
@@ -70,6 +70,56 @@ Organizations:
         # the genesis block in the Application section context.
         AnchorPeers:
             - Host: 127.0.0.1
+              Port: 7051
+
+    - &Org1
+       Name: Org1MSP
+       #SkipAsForeign: false
+       ID: Org1MSP
+       MSPDir: crypto-config/peerOrganizations/org1.example.com/msp
+
+       Policies: &Org1Policies
+           Readers:
+                Type: Signature
+                Rule: "OR('Org1MSP.admin','Org1MSP.peer','Org1MSP.client')"
+            Writers:
+                Type: Signature
+                Rule: "OR('Org1MSP.admin','Org1MSP.client')"
+            Admins:
+                Type: Signature
+                Rule: "OR('Org1MSP.admin')"
+            Endorsement:
+                Type: Signature
+                Rule: "OR('Org1MSP.peer')"
+        OrdererEndpoints:
+            - "127.0.0.1:7050"
+        AnchorPeers:
+            - Host: peer0.org1.example.com
+              Port: 7051
+
+    - &Org2
+       Name: Org2MSP
+       #SkipAsForeign: false
+       ID: Org2MSP
+       MSPDir: crypto-config/peerOrganizations/org2.example.com/msp
+
+       Policies: &Org2Policies
+           Readers:
+                Type: Signature
+                Rule: "OR('Org2MSP.admin','Org2MSP.peer','Org2MSP.client')"
+            Writers:
+                Type: Signature
+                Rule: "OR('Org2MSP.admin','Org2MSP.client')"
+            Admins:
+                Type: Signature
+                Rule: "OR('Org2MSP.admin')"
+            Endorsement:
+                Type: Signature
+                Rule: "OR('Org2MSP.peer')"
+        OrdererEndpoints:
+            - "127.0.0.1:7050"
+        AnchorPeers:
+            - Host: peer0.org2.example.com
               Port: 7051
 
 ################################################################################
@@ -255,7 +305,7 @@ Orderer: &OrdererDefaults
 
     # Orderer Type: The orderer implementation to start.
     # Available types are "solo" and "kafka".
-    OrdererType: solo
+    OrdererType: etcdraft
 
     # Addresses used to be the list of orderer addresses that clients and peers
     # could connect to.  However, this does not allow clients to associate orderer
@@ -263,7 +313,7 @@ Orderer: &OrdererDefaults
     # as TLS validation.  The preferred way to specify orderer addresses is now
     # to include the OrdererEndpoints item in your org definition
     Addresses:
-        # - 127.0.0.1:7050
+        - orderer.example.com:7050
 
     # Batch Timeout: The amount of time to wait before creating a batch.
     BatchTimeout: 2s
@@ -278,7 +328,7 @@ Orderer: &OrdererDefaults
 
         # Max Message Count: The maximum number of messages to permit in a
         # batch.  No block will contain more than this number of messages.
-        MaxMessageCount: 500
+        MaxMessageCount: 10
 
         # Absolute Max Bytes: The absolute maximum number of bytes allowed for
         # the serialized messages in a batch. The maximum block size is this value
@@ -323,18 +373,18 @@ Orderer: &OrdererDefaults
         # a subset of the host:port items enumerated in this list should be
         # replicated under the Orderer.Addresses key above.
         Consenters:
-            - Host: raft0.example.com
+            - Host: orderer.example.com
               Port: 7050
-              ClientTLSCert: path/to/ClientTLSCert0
-              ServerTLSCert: path/to/ServerTLSCert0
-            - Host: raft1.example.com
+              ClientTLSCert: crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls
+              ServerTLSCert: crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls
+            - Host: orderer2.example.com
               Port: 7050
-              ClientTLSCert: path/to/ClientTLSCert1
-              ServerTLSCert: path/to/ServerTLSCert1
-            - Host: raft2.example.com
+              ClientTLSCert: crypto-config/ordererOrganizations/example.com/orderers/orderer2.example.com/tls
+              ServerTLSCert: crypto-config/ordererOrganizations/example.com/orderers/orderer2.example.com/tls
+            - Host: orderer3.example.com
               Port: 7050
-              ClientTLSCert: path/to/ClientTLSCert2
-              ServerTLSCert: path/to/ServerTLSCert2
+              ClientTLSCert: crypto-config/ordererOrganizations/example.com/orderers/orderer3.example.com/tls
+              ServerTLSCert: crypto-config/ordererOrganizations/example.com/orderers/orderer3.example.com/tls
 
         # Options to be specified for all the etcd/raft nodes. The values here
         # are the defaults for all new channels and can be modified on a
@@ -601,3 +651,41 @@ Profiles:
                           Admins:
                               Type: Signature
                               Rule: "OR('SampleOrg.member')"
+
+    BasicChannel:
+        Consortiums: SampleConsortium
+        <<: *ChannelDefaults
+        Application:
+            <<: *ApplicationDefaults
+            Organizations:
+                - *Org1
+                - *Org2
+            Capabilities:
+                <<: *ApplicationCapabilities
+
+    OrdererGenesis:
+        <<: *ChannelDefaults
+        Capabilities:
+            <<: *ChannelCapabilities
+        Orderer:
+            <<: *OrdererDefaults
+            OrdererType: etcdraft
+            EtcdRaft: 
+                Consenters:
+                - Host: orderer.example.com
+                  Port: 7050
+                  ClientTLSCert: crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls
+                  ServerTLSCert: crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls
+
+                Addresses:
+                    - orderer.example.com:7050
+
+                Organizations:
+                - *OrdererOrg
+                Capabilities:
+                    <<: *OrdererCapabilities
+            Consortiums:
+                SampleConsortium:
+                    Organizations:
+                        - *Org1
+                        - *Org2
